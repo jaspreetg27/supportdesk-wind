@@ -1,0 +1,14 @@
+version: '3.8'
+
+# Development override - use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+  api:
+    environment:
+      - UVICORN_RELOAD=true
+      - WATCHFILES_FORCE_POLLING=1
+    # Additional volumes for development
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
