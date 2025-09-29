@@ -11,6 +11,10 @@ from alembic import context
 from supportdesk.config import settings
 from supportdesk.models import Base
 
+# Import all models to ensure they are registered with SQLAlchemy
+from supportdesk.tenants.models import Tenant  # noqa: F401
+from supportdesk.customers.models import Customer  # noqa: F401
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

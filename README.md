@@ -4,10 +4,14 @@ Production-grade AI-powered customer support backend built with FastAPI, SQLAlch
 
 ## Features
 
-- **Multi-platform messaging**: WhatsApp, Instagram, Facebook Messenger
+- **Multi-tenant Architecture**: Complete tenant isolation with path-scoped APIs
+- **Customer Management**: Full CRUD operations with tenant-scoped data isolation
 - **Async-first architecture**: Built on FastAPI with full async/await support
 - **Background processing**: Celery with Redis for reliable task execution
 - **Database migrations**: Alembic with async SQLAlchemy 2.x
+- **Pagination**: Configurable pagination with defaults (20 items/page, max 100)
+- **Soft Deletes**: Data preservation with admin-only access to inactive records
+- **Input Validation**: Comprehensive validation for emails, phones, slugs
 - **Health monitoring**: Comprehensive health checks for all services
 - **Developer experience**: Hot-reload, linting, type checking, testing
 
@@ -37,6 +41,8 @@ Production-grade AI-powered customer support backend built with FastAPI, SQLAlch
    make migrate
    # or
    ./scripts/dev.ps1 migrate
+   # or directly with docker-compose
+   docker-compose exec api alembic upgrade head
    ```
 
 4. **Verify health**:
@@ -84,6 +90,50 @@ make health-check # Test health endpoint
 
 ### Health Checks
 - `GET /healthz` - Overall system health
+
+### Tenants (Multi-tenant Management)
+- `POST /api/v1/tenants` - Create a new tenant
+- `GET /api/v1/tenants/{tenant_id}` - Get tenant by ID
+- `PUT /api/v1/tenants/{tenant_id}` - Update tenant
+- `DELETE /api/v1/tenants/{tenant_id}` - Soft delete tenant
+
+### Customers (Tenant-scoped)
+- `POST /api/v1/tenants/{tenant_id}/customers` - Create customer
+- `GET /api/v1/tenants/{tenant_id}/customers` - List customers (paginated)
+- `GET /api/v1/tenants/{tenant_id}/customers/{customer_id}` - Get customer
+- `PUT /api/v1/tenants/{tenant_id}/customers/{customer_id}` - Update customer
+- `DELETE /api/v1/tenants/{tenant_id}/customers/{customer_id}` - Soft delete customer
+
+#### Sample Requests
+
+**Create Tenant:**
+```bash
+curl -X POST "http://localhost:8000/api/v1/tenants/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Corporation",
+    "slug": "acme-corp",
+    "settings": {"timezone": "UTC", "locale": "en-US"}
+  }'
+```
+
+**Create Customer:**
+```bash
+curl -X POST "http://localhost:8000/api/v1/tenants/{tenant_id}/customers/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_id": "CRM-12345",
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "phone": "+1234567890",
+    "metadata": {"source": "website", "priority": "high"}
+  }'
+```
+
+**List Customers (Paginated):**
+```bash
+curl "http://localhost:8000/api/v1/tenants/{tenant_id}/customers/?page=1&page_size=20"
+```
 
 ## Development
 

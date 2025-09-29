@@ -8,19 +8,19 @@ from httpx import AsyncClient
 def test_health_endpoint_sync(client: TestClient) -> None:
     """Test health endpoint with sync client."""
     response = client.get("/healthz")
-    
+
     # Check response structure regardless of service availability
     assert response.status_code in [200, 503]
     data = response.json()
-    
+
     if response.status_code == 503:
         # If services are unavailable, check error response structure
+        assert "status" in data
+        assert "checks" in data
         assert "detail" in data
-        detail = data["detail"]
-        assert "status" in detail
-        assert "checks" in detail
-        assert "database" in detail["checks"]
-        assert "redis" in detail["checks"]
+        assert data["status"] == "error"
+        assert "database" in data["checks"]
+        assert "redis" in data["checks"]
     else:
         # If services are available, check success response
         assert data["status"] == "ok"
@@ -33,19 +33,19 @@ def test_health_endpoint_sync(client: TestClient) -> None:
 async def test_health_endpoint_async(async_client: AsyncClient) -> None:
     """Test health endpoint with async client."""
     response = await async_client.get("/healthz")
-    
+
     # Check response structure regardless of service availability
     assert response.status_code in [200, 503]
     data = response.json()
-    
+
     if response.status_code == 503:
         # If services are unavailable, check error response structure
+        assert "status" in data
+        assert "checks" in data
         assert "detail" in data
-        detail = data["detail"]
-        assert "status" in detail
-        assert "checks" in detail
-        assert "database" in detail["checks"]
-        assert "redis" in detail["checks"]
+        assert data["status"] == "error"
+        assert "database" in data["checks"]
+        assert "redis" in data["checks"]
     else:
         # If services are available, check success response
         assert data["status"] == "ok"

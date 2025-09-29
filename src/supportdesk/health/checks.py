@@ -1,7 +1,6 @@
 """Health check implementations."""
 
 import asyncio
-from typing import Dict
 
 from supportdesk.config import settings
 from supportdesk.database import check_database_health
@@ -22,7 +21,7 @@ async def check_service_health(check_func, timeout: int = None) -> str:
         return "error"
 
 
-async def get_health_status() -> Dict[str, str]:
+async def get_health_status() -> dict[str, str]:
     """Get overall health status."""
     # Run health checks concurrently
     db_task = asyncio.create_task(

@@ -1,7 +1,6 @@
 """Infrastructure tests."""
 
 import pytest
-
 from supportdesk.config import settings
 from supportdesk.worker.tasks import health_check_task
 
@@ -29,7 +28,7 @@ def test_database_url_format() -> None:
     assert settings.database_url.startswith("postgresql+asyncpg://")
 
 
-@pytest.mark.slow  
+@pytest.mark.slow
 def test_redis_url_format() -> None:
     """Test Redis URL format."""
     assert settings.redis_url.startswith("redis://")

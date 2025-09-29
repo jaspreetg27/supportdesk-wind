@@ -1,6 +1,5 @@
 """Background tasks."""
 
-import asyncio
 from typing import Any
 
 from supportdesk.worker.app import celery_app
