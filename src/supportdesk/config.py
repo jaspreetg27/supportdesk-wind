@@ -24,24 +24,33 @@ class Settings(BaseSettings):
 
     # --- Database ---
     database_url: str = Field(
-        description="Database connection URL",
-        examples=["postgresql+asyncpg://user:pass@localhost:5432/db"],
     )
     database_pool_size: int = Field(default=20, description="Database pool size")
     database_max_overflow: int = Field(default=30, description="Database max overflow")
 
-    # --- Redis ---
+    # Redis configuration
     redis_url: str = Field(
+        default="redis://localhost:6379/0",
         description="Redis connection URL",
         examples=["redis://localhost:6379/0"],
     )
     redis_max_connections: int = Field(default=20, description="Redis max connections")
 
+    # --- P2 Configuration ---
+    debounce_window_seconds: int = Field(
+        default=5,
+        description="Debounce window duration in seconds"
+    )
+    escalation_thresholds: str = Field(
+        default='{"escalation_minutes": 60, "urgent_priority": 8, "priority_increment": 1, "max_auto_escalations": 3}',
+        description="Escalation thresholds configuration as JSON"
+    )
+
     # --- Celery ---
     celery_broker_url: str = Field(description="Celery broker URL")
-    celery_result_backend: str = Field(description="Celery result backend URL")
     celery_task_serializer: str = Field(default="json", description="Celery task serializer")
     celery_result_serializer: str = Field(default="json", description="Celery result serializer")
+    celery_task_always_eager: bool = Field(default=False, description="Execute Celery tasks synchronously for testing")
 
     # --- Security ---
     secret_key: str = Field(description="Secret key for signing")

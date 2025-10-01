@@ -4,7 +4,7 @@ from uuid import UUID
 
 from supportdesk.common.errors import (
     tenant_not_found_exception,
-    tenant_slug_exists_exception,
+    slug_already_exists_exception,
 )
 from supportdesk.tenants.models import Tenant
 from supportdesk.tenants.repository import TenantRepository
@@ -21,7 +21,7 @@ class TenantService:
         """Create a new tenant with validation."""
         # Check if slug already exists
         if await self.tenant_repo.exists_by_slug(tenant_data.slug):
-            raise tenant_slug_exists_exception(tenant_data.slug)
+            raise slug_already_exists_exception(tenant_data.slug)
 
         # Create the tenant
         tenant = await self.tenant_repo.create(tenant_data)

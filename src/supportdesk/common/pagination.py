@@ -13,45 +13,24 @@ T = TypeVar("T")
 
 class PaginationParams(BaseModel):
     """Pagination parameters for API requests."""
-
-    page: int = Field(
-        default=1,
-        ge=1,
-        description="Page number (1-based)"
-    )
-    page_size: int = Field(
-        default=None,
-        ge=1,
-        description="Items per page"
-    )
-
-    @model_validator(mode='before')
-    @classmethod
-    def set_default_page_size(cls, values):
-        """Set default page_size from settings if not provided."""
-        if isinstance(values, dict) and values.get("page_size") is None:
-            values["page_size"] = settings.page_size_default
-        return values
-
+    
+    page: int = Field(1, ge=1)
+    page_size: int = Field(20, ge=1)
+    
     @property
     def offset(self) -> int:
-        """Calculate the offset for database queries."""
         return (self.page - 1) * self.page_size
-
+    
     @property
     def limit(self) -> int:
-        """Get the limit for database queries."""
         return self.page_size
 
 
 def get_pagination_params(
     page: int = Query(1, ge=1, description="Page number (1-based)"),
-    page_size: int = Query(None, ge=1, description="Items per page"),
+    page_size: int = Query(20, ge=1, description="Items per page"),
 ) -> PaginationParams:
     """FastAPI dependency for pagination parameters."""
-    if page_size is None:
-        page_size = settings.page_size_default
-    
     return PaginationParams(page=page, page_size=page_size)
 
 

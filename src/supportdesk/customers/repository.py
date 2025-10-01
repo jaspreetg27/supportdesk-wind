@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from supportdesk.common.errors import customer_external_id_exists_exception
+from supportdesk.common.errors import external_id_already_exists_exception
 from supportdesk.customers.models import Customer
 from supportdesk.customers.schemas import CustomerCreate, CustomerUpdate
 
@@ -103,7 +103,7 @@ class CustomerRepository:
             # Check if it's an external_id uniqueness violation
             if "uq_customer_tenant_external_id" in str(e) or "external_id" in str(e):
                 if customer_data.external_id:
-                    raise customer_external_id_exists_exception(customer_data.external_id, tenant_id)
+                    raise external_id_already_exists_exception(customer_data.external_id, tenant_id)
             raise
 
     async def update(self, customer: Customer, customer_data: CustomerUpdate) -> Customer:

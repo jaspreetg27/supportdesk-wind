@@ -15,22 +15,16 @@ class Tenant(BaseModel):
     """Tenant model representing an organization or workspace."""
 
     __tablename__ = "tenants"
-
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     settings_: Mapped[dict] = mapped_column("settings", JSON, default=dict, nullable=False)
 
     # Relationships
-    customers: Mapped[list["Customer"]] = relationship(
-        "Customer",
-        back_populates="tenant",
-        cascade="all, delete-orphan",
-        lazy="select"
-    )
+    customers = relationship("Customer", back_populates="tenant", cascade="all, delete-orphan")
+    threads = relationship("Thread", back_populates="tenant", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (
-        Index("idx_tenants_slug", "slug"),
         Index("idx_tenants_is_active", "is_active"),
     )
 

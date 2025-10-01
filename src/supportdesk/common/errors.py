@@ -1,6 +1,6 @@
 """Custom exceptions and error handling."""
 
-from typing import Any, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -48,7 +48,6 @@ def create_http_exception(
     message: str,
     details: Optional[dict[str, Any]] = None,
 ) -> HTTPException:
-    """Create a standardized HTTP exception."""
     detail = {
         "error": error_code,
         "message": message,
@@ -60,60 +59,162 @@ def create_http_exception(
 
 
 def tenant_not_found_exception(tenant_id: UUID) -> HTTPException:
-    """Create a tenant not found exception."""
-    return create_http_exception(
+    """Create a 404 exception for tenant not found."""
+    return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        error_code=TenantError.TENANT_NOT_FOUND,
-        message="Tenant not found or inactive",
-        details={"tenant_id": str(tenant_id)},
+        detail={
+            "error": "TENANT_NOT_FOUND",
+            "message": f"Tenant with id '{tenant_id}' not found or inactive",
+            "tenant_id": str(tenant_id)
+        }
     )
 
 
 def customer_not_found_exception(customer_id: UUID, tenant_id: UUID) -> HTTPException:
-    """Create a customer not found exception."""
-    return create_http_exception(
+    """Create a 404 exception for customer not found."""
+    return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        error_code=CustomerError.CUSTOMER_NOT_FOUND,
-        message="Customer not found or inactive",
-        details={"customer_id": str(customer_id), "tenant_id": str(tenant_id)},
+        detail={
+            "error": "CUSTOMER_NOT_FOUND",
+            "message": f"Customer with id '{customer_id}' not found in tenant '{tenant_id}'",
+            "customer_id": str(customer_id),
+            "tenant_id": str(tenant_id)
+        }
     )
 
 
-def cross_tenant_access_exception(tenant_id: UUID, resource_type: str) -> HTTPException:
-    """Create a cross-tenant access exception."""
-    return create_http_exception(
-        status_code=status.HTTP_403_FORBIDDEN,
-        error_code=CustomerError.CROSS_TENANT_ACCESS,
-        message=f"Access denied: {resource_type} belongs to different tenant",
-        details={"tenant_id": str(tenant_id), "resource_type": resource_type},
+def thread_not_found_exception(thread_id: UUID, tenant_id: UUID) -> HTTPException:
+    """Create a 404 exception for thread not found."""
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={
+            "error": "THREAD_NOT_FOUND",
+            "message": f"Thread with id '{thread_id}' not found in tenant '{tenant_id}'",
+            "thread_id": str(thread_id),
+            "tenant_id": str(tenant_id)
+        }
     )
 
 
-def tenant_slug_exists_exception(slug: str) -> HTTPException:
-    """Create a tenant slug exists exception."""
-    return create_http_exception(
+def message_not_found_exception(message_id: UUID, tenant_id: UUID) -> HTTPException:
+    """Create a 404 exception for message not found."""
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={
+            "error": "MESSAGE_NOT_FOUND",
+            "message": f"Message with id '{message_id}' not found in tenant '{tenant_id}'",
+            "message_id": str(message_id),
+            "tenant_id": str(tenant_id)
+        }
+    )
+
+
+def slug_already_exists_exception(slug: str) -> HTTPException:
+    """Create a 409 exception for duplicate slug."""
+    return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
-        error_code=TenantError.TENANT_SLUG_EXISTS,
-        message=f"Tenant with slug '{slug}' already exists",
-        details={"slug": slug},
+        detail={
+            "error": "TENANT_SLUG_EXISTS",
+            "message": f"Tenant with slug '{slug}' already exists",
+            "slug": slug
+        }
     )
 
 
-def tenant_slug_reserved_exception(slug: str) -> HTTPException:
-    """Create a tenant slug reserved exception."""
-    return create_http_exception(
+def external_id_already_exists_exception(external_id: str, tenant_id: UUID) -> HTTPException:
+    """Create a 409 exception for duplicate external_id."""
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "error": "CUSTOMER_EXTERNAL_ID_EXISTS",
+            "message": f"Customer with external_id '{external_id}' already exists in tenant '{tenant_id}'",
+            "external_id": external_id,
+            "tenant_id": str(tenant_id)
+        }
+    )
+
+
+def platform_thread_exists_exception(
+    platform: str, 
+    platform_thread_id: str, 
+    tenant_id: UUID,
+    existing_thread_id: UUID
+) -> HTTPException:
+    """Create a 409 exception for duplicate platform thread."""
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "error": "PLATFORM_THREAD_EXISTS",
+            "message": f"Thread with platform_thread_id '{platform_thread_id}' already exists for this tenant and platform",
+            "platform": platform,
+            "platform_thread_id": platform_thread_id,
+            "existing_thread_id": str(existing_thread_id),
+            "tenant_id": str(tenant_id)
+        }
+    )
+
+
+def platform_message_exists_exception(
+    thread_id: UUID,
+    platform_message_id: str,
+    existing_message_id: UUID
+) -> HTTPException:
+    """Create a 409 exception for duplicate platform message."""
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "error": "PLATFORM_MESSAGE_EXISTS",
+            "message": f"Message with platform_message_id '{platform_message_id}' already exists in this thread",
+            "thread_id": str(thread_id),
+            "platform_message_id": platform_message_id,
+            "existing_message_id": str(existing_message_id)
+        }
+    )
+
+
+def immutable_field_exception(attempted_field: str) -> HTTPException:
+    """Create a 422 exception for immutable field modification."""
+    return HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        error_code=TenantError.TENANT_SLUG_RESERVED,
-        message=f"Slug '{slug}' is reserved and cannot be used",
-        details={"slug": slug},
+        detail={
+            "error": "IMMUTABLE_FIELD",
+            "message": f"Cannot modify immutable field '{attempted_field}'",
+            "immutable_fields": ["platform_message_id", "type", "thread_id"],
+            "allowed_fields": ["content", "metadata", "sent_at"],
+            "attempted_field": attempted_field
+        }
     )
 
 
-def customer_external_id_exists_exception(external_id: str, tenant_id: UUID) -> HTTPException:
-    """Create a customer external ID exists exception."""
-    return create_http_exception(
-        status_code=status.HTTP_409_CONFLICT,
-        error_code=CustomerError.CUSTOMER_EXTERNAL_ID_EXISTS,
-        message=f"Customer with external_id '{external_id}' already exists in this tenant",
-        details={"external_id": external_id, "tenant_id": str(tenant_id)},
+class StateTransitionError(Exception):
+    """Exception for invalid state transitions."""
+    
+    def __init__(
+        self,
+        current_state: str,
+        attempted_state: str,
+        allowed_transitions: List[str],
+        thread_id: UUID
+    ):
+        self.current_state = current_state
+        self.attempted_state = attempted_state
+        self.allowed_transitions = allowed_transitions
+        self.thread_id = thread_id
+        super().__init__(f"Cannot transition from '{current_state}' to '{attempted_state}'")
+
+
+def state_transition_exception(error: StateTransitionError) -> HTTPException:
+    """Create a 422 exception for invalid state transition."""
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={
+            "error": "STATE_TRANSITION_INVALID",
+            "message": f"Cannot transition from '{error.current_state}' to '{error.attempted_state}'",
+            "details": {
+                "current_state": error.current_state,
+                "attempted_state": error.attempted_state,
+                "allowed_transitions": error.allowed_transitions,
+                "thread_id": str(error.thread_id)
+            }
+        }
     )

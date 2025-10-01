@@ -28,4 +28,7 @@ celery_app.conf.update(
     worker_disable_rate_limits=False,
     task_compression="gzip",
     result_compression="gzip",
+    # Enable eager execution for testing
+    task_always_eager=getattr(settings, 'celery_task_always_eager', False),
+    task_eager_propagates=True,
 )

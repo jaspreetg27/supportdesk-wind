@@ -4,20 +4,32 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from supportdesk import __version__
 from supportdesk.config import settings
-from supportdesk.customers.router import router as customers_router
-from supportdesk.health.router import router as health_router
 from supportdesk.redis_client import close_redis
+from supportdesk.customers.router import router as customers_router
+from supportdesk.events.router import router as events_router
+from supportdesk.health.router import router as health_router
+from supportdesk.messages.router import router as messages_router
+from supportdesk.threads.router import router as threads_router
 from supportdesk.tenants.router import router as tenants_router
+
+# Import all models to register them with SQLAlchemy
+from supportdesk.tenants import models as tenant_models  # noqa: F401
+from supportdesk.customers import models as customer_models  # noqa: F401
+from supportdesk.threads import models as thread_models  # noqa: F401
+from supportdesk.messages import models as message_models  # noqa: F401
+from supportdesk.events import models as event_models  # noqa: F401
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan manager."""
+async def Lifecycle(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Application Lifecycle manager."""
     # Startup
     yield
     # Shutdown
@@ -35,17 +47,28 @@ tags_metadata = [
         "description": "Tenant management operations. Tenants are the top-level organizational units that provide multi-tenant isolation.",
     },
     {
-        "name": "customers",
-        "description": "Customer management within tenants. All customer operations are tenant-scoped for data isolation.",
+        "name": "Customers",
+        "description": "Customer management operations",
+    },
+    {
+        "name": "Threads",
+        "description": "Conversation thread management",
+    },
+    {
+        "name": "Messages",
+        "description": "Message operations within threads",
+    },
+    {
+        "name": "Thread Events",
+        "description": "Thread event audit trail",
     },
 ]
 
 # Create FastAPI application
 app = FastAPI(
-    title="SupportDesk AI",
     description="Production-grade AI-powered customer support backend with multi-tenant architecture",
     version=__version__,
-    lifespan=lifespan,
+    lifespan=Lifecycle,
     docs_url="/docs" if settings.is_development else None,
     redoc_url="/redoc" if settings.is_development else None,
     openapi_tags=tags_metadata,
@@ -60,6 +83,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         status_code=exc.status_code,
         content=exc.detail,
     )
+
+
+
+
 
 # Add CORS middleware
 app.add_middleware(
@@ -81,6 +108,21 @@ app.include_router(
     customers_router,
     prefix="/api/v1/tenants/{tenant_id}/customers",
     tags=["customers"]
+)
+app.include_router(
+    threads_router,
+    prefix="/api/v1/tenants/{tenant_id}",
+    tags=["Threads"]
+)
+app.include_router(
+    messages_router,
+    prefix="/api/v1/tenants/{tenant_id}",
+    tags=["Messages"]
+)
+app.include_router(
+    events_router,
+    prefix="/api/v1/tenants/{tenant_id}",
+    tags=["Thread Events"]
 )
 
 

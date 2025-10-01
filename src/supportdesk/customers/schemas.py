@@ -2,17 +2,30 @@
 
 import re
 from datetime import datetime
-from typing import Any, Optional
 from uuid import UUID
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from typing import Any, Optional
 
-# Accept common formatting by stripping spaces, (), -, then validate E.164-ish
-_PHONE_CORE_RE = re.compile(r"^\+?[0-9]{7,15}$")
+# E.164 validation pattern - requires 7-15 total digits
+_E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
 
 def _normalize_phone(raw: str) -> str:
-    # keep digits and + only, drop spaces, dashes, parentheses etc.
+    """Normalize phone number to E.164 format."""
+    # Keep digits and + only, remove all other characters
     cleaned = re.sub(r"[^\d+]", "", raw)
+    
+    # Keep only the first + if present, remove any others
+    if "+" in cleaned:
+        parts = cleaned.split("+")
+        # parts[0] will be empty if + is at start, otherwise contains digits before +
+        digits_before = parts[0] if parts[0] else ""
+        # Join all parts after the first + and take only digits
+        digits_after = "".join(parts[1:])
+        cleaned = "+" + digits_before + digits_after
+    else:
+        # No + present, prepend + to all digits
+        cleaned = "+" + cleaned
+    
     return cleaned
 
 
@@ -45,14 +58,12 @@ class CustomerBase(BaseModel):
 
     @field_validator("phone")
     @classmethod
-    def _validate_phone(cls, v: Optional[str]) -> Optional[str]:
-        """Validate phone number format."""
-        if v is None or v == "":
-            return None
-        norm = _normalize_phone(v)
-        if not _PHONE_CORE_RE.match(norm):
-            raise ValueError("invalid phone number format")
-        return norm
+    def valid_phone(cls, v):
+        if v is None: return v
+        # Accept both formats: +1234567890 or 1234567890 (7-15 digits)
+        if not re.fullmatch(r"(\+\d{7,15}|\d{7,15})", v):
+            raise ValueError("Invalid phone")
+        return v
 
 
 class CustomerCreate(CustomerBase):
@@ -103,9 +114,10 @@ class CustomerUpdate(BaseModel):
         """Validate phone number format."""
         if v is None or v == "":
             return None
+        
         norm = _normalize_phone(v)
-        if not _PHONE_CORE_RE.match(norm):
-            raise ValueError("invalid phone number format")
+        if not _E164_RE.match(norm):
+            raise ValueError("Phone number must be in E.164 format (e.g., +1234567890).")
         return norm
 
     model_config = ConfigDict(

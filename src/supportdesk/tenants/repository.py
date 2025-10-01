@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from supportdesk.common.errors import tenant_slug_exists_exception
+from supportdesk.common.errors import slug_already_exists_exception
 from supportdesk.tenants.models import Tenant
 from supportdesk.tenants.schemas import TenantCreate, TenantUpdate
 
@@ -54,7 +54,7 @@ class TenantRepository:
             await self.db.rollback()
             # Check if it's a slug uniqueness violation
             if "tenants_slug_key" in str(e) or "uq_tenants_slug" in str(e):
-                raise tenant_slug_exists_exception(tenant_data.slug)
+                raise slug_already_exists_exception(tenant_data.slug)
             raise
 
     async def update(self, tenant: Tenant, tenant_data: TenantUpdate) -> Tenant:

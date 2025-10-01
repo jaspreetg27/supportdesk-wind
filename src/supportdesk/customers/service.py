@@ -3,8 +3,8 @@
 from uuid import UUID
 
 from supportdesk.common.errors import (
-    customer_external_id_exists_exception,
     customer_not_found_exception,
+    external_id_already_exists_exception,
     tenant_not_found_exception,
 )
 from supportdesk.common.pagination import PaginatedResponse, PaginationParams
@@ -39,7 +39,7 @@ class CustomerService:
         # Check if external_id already exists within the tenant
         if customer_data.external_id:
             if await self.customer_repo.exists_by_external_id(tenant_id, customer_data.external_id):
-                raise customer_external_id_exists_exception(customer_data.external_id, tenant_id)
+                raise external_id_already_exists_exception(customer_data.external_id, tenant_id)
 
         # Create the customer
         customer = await self.customer_repo.create(tenant_id, customer_data)

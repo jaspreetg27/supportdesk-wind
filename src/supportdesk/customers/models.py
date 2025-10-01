@@ -24,8 +24,8 @@ class Customer(BaseModel):
     )
 
     # Customer fields
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     external_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
@@ -36,10 +36,15 @@ class Customer(BaseModel):
         back_populates="customers",
         lazy="select"
     )
+    threads: Mapped[list["Thread"]] = relationship(
+        "Thread",
+        back_populates="customer",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
 
     # Constraints and indexes
     __table_args__ = (
-        # Unique constraint for external_id within a tenant
         UniqueConstraint(
             "tenant_id",
             "external_id",
