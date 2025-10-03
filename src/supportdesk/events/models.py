@@ -1,7 +1,8 @@
 """Thread event SQLAlchemy models."""
 
+import enum
 from datetime import datetime
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, String, JSON, func
@@ -9,7 +10,10 @@ from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID, ENUM as Postg
 from sqlalchemy.orm import relationship
 
 from supportdesk.models.base import BaseModel
-from supportdesk.threads.models import ActorType, ThreadState
+from supportdesk.common.enums import ActorType, ThreadState
+
+if TYPE_CHECKING:
+    from supportdesk.threads.models import Thread
 
 
 class ThreadEvent(BaseModel):

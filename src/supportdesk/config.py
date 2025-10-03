@@ -45,9 +45,18 @@ class Settings(BaseSettings):
         default='{"escalation_minutes": 60, "urgent_priority": 8, "priority_increment": 1, "max_auto_escalations": 3}',
         description="Escalation thresholds configuration as JSON"
     )
+    auto_ack_test_mode: bool = Field(
+        default=False,
+        description="Enable auto-ACK for testing purposes"
+    )
+    AUTO_ACK_ENABLED: bool = Field(
+        default=False,
+        description="Enable auto-ACK after debounce"
+    )
 
     # --- Celery ---
-    celery_broker_url: str = Field(description="Celery broker URL")
+    celery_broker_url: str = Field(default="redis://localhost:6379/1", description="Celery broker URL")
+    celery_result_backend: str = Field(default="redis://localhost:6379/2", description="Celery result backend URL")
     celery_task_serializer: str = Field(default="json", description="Celery task serializer")
     celery_result_serializer: str = Field(default="json", description="Celery result serializer")
     celery_task_always_eager: bool = Field(default=False, description="Execute Celery tasks synchronously for testing")

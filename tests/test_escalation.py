@@ -51,7 +51,9 @@ class TestEscalation:
     
     def test_escalation_priority_increment(self, client: TestClient, tenant_id: str, thread_id: str):
         """Test escalation increments priority correctly."""
-        from supportdesk.worker.tasks import escalation_tick
+        import asyncio
+        from supportdesk.worker.tasks import escalation_tick_async
+        from supportdesk.database import AsyncSessionLocal
         
         # Set thread to acknowledged state
         transition_data = {
@@ -74,8 +76,8 @@ class TestEscalation:
                     mock_thread.priority = 2
                     mock_find_stale.return_value = [mock_thread]
                     
-                    # Run escalation
-                    escalation_tick()
+                    # Run escalation with test session maker
+                    asyncio.run(escalation_tick_async(AsyncSessionLocal))
                     
                     # Should increment priority by 1 (2 + 1 = 3)
                     mock_update.assert_called_once_with(thread_id, 3)
@@ -92,7 +94,9 @@ class TestEscalation:
     
     def test_escalation_priority_cap_at_10(self, client: TestClient, tenant_id: str, thread_id: str):
         """Test escalation caps priority at 10."""
-        from supportdesk.worker.tasks import escalation_tick
+        import asyncio
+        from supportdesk.worker.tasks import escalation_tick_async
+        from supportdesk.database import AsyncSessionLocal
         
         with patch('supportdesk.threads.repository.ThreadRepository.find_stale_threads') as mock_find_stale:
             with patch('supportdesk.events.repository.ThreadEventRepository.count_escalations') as mock_count:
@@ -106,18 +110,22 @@ class TestEscalation:
                     mock_thread.priority = 9
                     mock_find_stale.return_value = [mock_thread]
                     
-                    escalation_tick()
+                    # Run escalation with test session maker
+                    asyncio.run(escalation_tick_async(AsyncSessionLocal))
                     
                     # Should cap at 10 (min(9 + 1, 10) = 10)
                     mock_update.assert_called_once_with(thread_id, 10)
     
     def test_escalation_idempotency_per_hour(self, client: TestClient, tenant_id: str, thread_id: str):
         """Test escalation idempotency within same hour window."""
-        from supportdesk.worker.tasks import escalation_tick, generate_deterministic_uuid
+        import asyncio
+        from supportdesk.worker.tasks import escalation_tick_async, generate_deterministic_uuid
+        from supportdesk.database import AsyncSessionLocal
         from datetime import datetime
         
         # Generate deterministic ID for current hour
-        current_hour = datetime.now(datetime.UTC).replace(minute=0, second=0, microsecond=0)
+        from datetime import timezone
+        current_hour = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
         escalation_event_id = generate_deterministic_uuid(f"escalation:{thread_id}:{current_hour.isoformat()}")
         
         # First escalation should process
@@ -133,7 +141,8 @@ class TestEscalation:
                     mock_thread.priority = 1
                     mock_find_stale.return_value = [mock_thread]
                     
-                    escalation_tick()
+                    # Run escalation with test session maker
+                    asyncio.run(escalation_tick_async(AsyncSessionLocal))
                     
                     # Should check for existing escalation
                     mock_get_by_corr.assert_called_with(escalation_event_id)
@@ -150,7 +159,8 @@ class TestEscalation:
                     mock_thread.id = thread_id
                     mock_find_stale.return_value = [mock_thread]
                     
-                    escalation_tick()
+                    # Run escalation with test session maker
+                    asyncio.run(escalation_tick_async(AsyncSessionLocal))
                     
                     # Should not update priority (idempotent)
                     mock_update.assert_not_called()

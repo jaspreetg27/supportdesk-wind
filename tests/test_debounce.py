@@ -86,37 +86,46 @@ class TestDebounceIntegration:
     
     def test_auto_ack_after_debounce(self, client: TestClient, tenant_id: str, thread_id: str):
         """Test auto-acknowledgment after debounce flush."""
-        # Verify thread starts in 'new' state
-        response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}")
-        assert response.json()["state"] == "new"
+        # Enable auto-ack test mode for this test
+        from supportdesk.config import settings
+        original_auto_ack = settings.auto_ack_test_mode
+        settings.auto_ack_test_mode = True
         
-        # Send inbound message (triggers debounce)
-        message_data = {
-            "platform_message_id": "auto_ack_msg",
-            "type": "inbound",
-            "content": "This should trigger auto-ack"
-        }
-        
-        response = client.post(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/messages/", json=message_data)
-        assert response.status_code == 201
-        
-        # Simulate debounce flush (in real scenario this would be async)
-        # For testing, we check that the message creation triggered state change
-        response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}")
-        thread_data = response.json()
-        assert thread_data["state"] == "acknowledged"
-        
-        # Check events for debounce and auto-ack
-        response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/events/")
-        events = response.json()["items"]
-        
-        # Should have state transition event
-        transition_events = [e for e in events if e["event_type"] == "state_transition"]
-        assert len(transition_events) >= 1
-        
-        auto_ack_event = next(e for e in transition_events if e["new_state"] == "acknowledged")
-        assert auto_ack_event["old_state"] == "new"
-        assert auto_ack_event["actor_type"] == "system"
+        try:
+            # Verify thread starts in 'new' state
+            response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}")
+            assert response.json()["state"] == "new"
+            
+            # Send inbound message (triggers debounce)
+            message_data = {
+                "platform_message_id": "auto_ack_msg",
+                "type": "inbound",
+                "content": "This should trigger auto-ack"
+            }
+            
+            response = client.post(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/messages/", json=message_data)
+            assert response.status_code == 201
+            
+            # Simulate debounce flush (in real scenario this would be async)
+            # For testing, we check that the message creation triggered state change
+            response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}")
+            thread_data = response.json()
+            assert thread_data["state"] == "acknowledged"
+            
+            # Check events for debounce and auto-ack
+            response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/events/")
+            events = response.json()["items"]
+            
+            # Should have state transition event
+            transition_events = [e for e in events if e["event_type"] == "state_transition"]
+            assert len(transition_events) >= 1
+            
+            auto_ack_event = next(e for e in transition_events if e["new_state"] == "acknowledged")
+            assert auto_ack_event["old_state"] == "new"
+            assert auto_ack_event["actor_type"] == "system"
+        finally:
+            # Restore original setting
+            settings.auto_ack_test_mode = original_auto_ack
     
     def test_no_auto_ack_for_system_messages(self, client: TestClient, tenant_id: str, thread_id: str):
         """Test system messages don't trigger auto-acknowledgment."""

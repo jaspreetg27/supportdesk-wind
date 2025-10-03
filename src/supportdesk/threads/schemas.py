@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from supportdesk.threads.models import ThreadState, PlatformType, ActorType
+from supportdesk.common.enums import ThreadState, PlatformType, ActorType
 
 
 class ThreadCreate(BaseModel):

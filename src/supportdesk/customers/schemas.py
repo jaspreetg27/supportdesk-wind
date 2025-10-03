@@ -6,8 +6,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from typing import Any, Optional
 
-# E.164 validation pattern - requires 7-15 total digits
-_E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
+# E.164 validation pattern - requires + followed by 9-15 digits
+_E164_RE = re.compile(r"^\+\d{9,15}$")
 
 def _normalize_phone(raw: str) -> str:
     """Normalize phone number to E.164 format."""
@@ -59,10 +59,13 @@ class CustomerBase(BaseModel):
     @field_validator("phone")
     @classmethod
     def valid_phone(cls, v):
-        if v is None: return v
-        # Accept both formats: +1234567890 or 1234567890 (7-15 digits)
-        if not re.fullmatch(r"(\+\d{7,15}|\d{7,15})", v):
-            raise ValueError("Invalid phone")
+        """Validate phone number format."""
+        if v is None or v == "":
+            return None
+        
+        # Enforce E.164 format: + followed by 9-15 digits
+        if not _E164_RE.match(v):
+            raise ValueError("Phone number must be in E.164 format (+ followed by 9-15 digits, e.g., +1234567890)")
         return v
 
 
@@ -115,10 +118,10 @@ class CustomerUpdate(BaseModel):
         if v is None or v == "":
             return None
         
-        norm = _normalize_phone(v)
-        if not _E164_RE.match(norm):
-            raise ValueError("Phone number must be in E.164 format (e.g., +1234567890).")
-        return norm
+        # Enforce E.164 format: + followed by 9-15 digits
+        if not _E164_RE.match(v):
+            raise ValueError("Phone number must be in E.164 format (+ followed by 9-15 digits, e.g., +1234567890)")
+        return v
 
     model_config = ConfigDict(
         json_schema_extra={

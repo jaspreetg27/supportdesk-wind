@@ -2,7 +2,7 @@
 
 import enum
 from datetime import datetime
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 from sqlalchemy import (
@@ -14,31 +14,14 @@ from sqlalchemy.orm import relationship
 
 from supportdesk.models.base import BaseModel
 
+if TYPE_CHECKING:
+    from supportdesk.customers.models import Customer
+    from supportdesk.tenants.models import Tenant
+    from supportdesk.messages.models import Message
+    from supportdesk.events.models import ThreadEvent
 
-class ThreadState(str, enum.Enum):
-    """Thread state enumeration."""
-    NEW = "new"
-    ACKNOWLEDGED = "acknowledged"
-    IN_PROGRESS = "in_progress"
-    WAITING_FOR_CUSTOMER = "waiting_for_customer"
-    NEEDS_REVIEW = "needs_review"
-    URGENT = "urgent"
-    RESOLVED = "resolved"
-    CLOSED = "closed"
-
-
-class PlatformType(str, enum.Enum):
-    """Platform type enumeration."""
-    WHATSAPP = "whatsapp"
-    INSTAGRAM = "instagram"
-    FACEBOOK = "facebook"
-    INTERNAL = "internal"
-
-
-class ActorType(str, enum.Enum):
-    """Actor type enumeration."""
-    SYSTEM = "system"
-    USER = "user"
+# Import common enums
+from supportdesk.common.enums import ActorType, PlatformType, ThreadState
 
 
 class Thread(BaseModel):
@@ -91,10 +74,10 @@ class Thread(BaseModel):
     )
     
     # Relationships
-    tenant = relationship("Tenant", back_populates="threads")
-    customer = relationship("Customer", back_populates="threads")
-    messages = relationship("Message", back_populates="thread", cascade="all, delete-orphan")
-    events = relationship("ThreadEvent", back_populates="thread", cascade="all, delete-orphan")
+    tenant = relationship("Tenant", back_populates="threads", lazy="selectin")
+    customer = relationship("Customer", back_populates="threads", lazy="selectin")
+    messages = relationship("Message", back_populates="thread", cascade="all, delete-orphan", lazy="selectin")
+    events = relationship("ThreadEvent", back_populates="thread", cascade="all, delete-orphan", lazy="selectin")
     
     # Constraints
     __table_args__ = (

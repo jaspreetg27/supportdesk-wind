@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from supportdesk.common.deps import TenantContext, get_tenant_context
 from supportdesk.common.pagination import PaginatedResponse, PaginationParams, get_pagination_params
 from supportdesk.database import get_db
-from supportdesk.threads.models import ThreadState, PlatformType
+from supportdesk.common.enums import ThreadState, PlatformType
 from supportdesk.threads.schemas import ThreadCreate, ThreadResponse, StateTransition
 from supportdesk.threads.service import ThreadService
 

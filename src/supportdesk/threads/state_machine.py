@@ -4,7 +4,7 @@ from typing import Dict, Set
 from uuid import UUID
 
 from supportdesk.common.errors import StateTransitionError
-from supportdesk.threads.models import ThreadState
+from supportdesk.common.enums import ThreadState
 
 
 class ThreadStateMachine:

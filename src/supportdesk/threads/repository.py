@@ -3,15 +3,17 @@
 from datetime import datetime, timedelta, UTC
 from typing import Optional, Tuple
 from uuid import UUID
+import datetime as dt
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from supportdesk.common.errors import platform_thread_exists_exception
 from supportdesk.config import settings
-from supportdesk.threads.models import Thread, ThreadState, PlatformType
+from supportdesk.threads.models import Thread
+from supportdesk.common.enums import ThreadState, PlatformType
 
 
 class ThreadRepository:
@@ -62,12 +64,14 @@ class ThreadRepository:
                 )
             raise
     
-    async def get_by_id(self, thread_id: UUID, tenant_id: UUID, include_messages: bool = False, message_limit: int = 10) -> Optional[Thread]:
+    async def get_by_id(self, thread_id: UUID, tenant_id: UUID, include_messages: bool = False, message_limit: int = 10, include_inactive: bool = False) -> Optional[Thread]:
         """Get a thread by ID within tenant scope."""
         query = select(Thread).where(
             Thread.id == thread_id,
             Thread.tenant_id == tenant_id
         )
+        if not include_inactive:
+            query = query.where(Thread.is_active == True)
         
         result = await self.db.execute(query)
         thread = result.scalar_one_or_none()
@@ -228,3 +232,34 @@ class ThreadRepository:
         
         result = await self.db.execute(query)
         return list(result.scalars().all())
+
+    async def cascade_soft_delete_thread(self, thread_id: UUID, tenant_id: UUID) -> None:
+        """Cascade soft delete a thread and all related messages and events."""
+        now = dt.datetime.now(dt.timezone.utc)
+        
+        # Soft delete the thread
+        await self.db.execute(
+            update(Thread)
+            .where(Thread.id == thread_id, Thread.tenant_id == tenant_id)
+            .values(is_active=False, updated_at=now)
+        )
+        
+        # Import here to avoid circular imports
+        from supportdesk.messages.models import Message
+        from supportdesk.events.models import ThreadEvent
+        
+        # Soft delete all messages for this thread
+        await self.db.execute(
+            update(Message)
+            .where(Message.thread_id == thread_id)
+            .values(is_active=False, updated_at=now)
+        )
+        
+        # Soft delete all events for this thread
+        await self.db.execute(
+            update(ThreadEvent)
+            .where(ThreadEvent.thread_id == thread_id)
+            .values(is_active=False, updated_at=now)
+        )
+        
+        await self.db.commit()

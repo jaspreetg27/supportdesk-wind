@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from supportdesk.messages.models import MessageType
+from supportdesk.common.enums import MessageType
 
 
 class MessageCreate(BaseModel):

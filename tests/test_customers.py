@@ -423,8 +423,8 @@ class TestCustomerValidation:
         """Test various valid phone formats."""
         valid_phones = [
             "+1234567890",
-            "+12345678901234",  # Maximum length
-            "1234567890",  # Without plus
+            "+12345678901234",  # Maximum length (15 digits)
+            "+123456789",  # Minimum length (9 digits)
             "+919876543210",  # Indian format
         ]
 

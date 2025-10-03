@@ -49,14 +49,18 @@ class ThreadEventRepository:
         thread_check = await self.db.execute(
             select(Thread).where(
                 Thread.id == thread_id,
-                Thread.tenant_id == tenant_id
+                Thread.tenant_id == tenant_id,
+                Thread.is_active == True
             )
         )
         if not thread_check.scalar_one_or_none():
             raise thread_not_found_exception(thread_id, tenant_id)
         
         # Base query
-        base_query = select(ThreadEvent).where(ThreadEvent.thread_id == thread_id)
+        base_query = select(ThreadEvent).where(
+            ThreadEvent.thread_id == thread_id,
+            ThreadEvent.is_active == True
+        )
         
         # Count query
         count_query = select(func.count()).select_from(base_query.subquery())
@@ -80,7 +84,7 @@ class ThreadEventRepository:
         result = await self.db.execute(
             select(ThreadEvent).where(ThreadEvent.correlation_id == correlation_id)
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
     
     async def get_by_id(self, event_id: UUID, tenant_id: UUID) -> Optional[ThreadEvent]:
         """Get an event by ID with tenant validation."""

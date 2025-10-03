@@ -1,6 +1,6 @@
 """Tenant repository for database operations."""
 
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -81,3 +81,9 @@ class TenantRepository:
 
         result = await self.db.execute(query)
         return result.scalar_one_or_none() is not None
+
+    async def list_active(self) -> List[Tenant]:
+        """Get all active tenants."""
+        query = select(Tenant).where(Tenant.is_active == True)
+        result = await self.db.execute(query)
+        return list(result.scalars().all())

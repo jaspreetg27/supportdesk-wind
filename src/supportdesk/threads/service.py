@@ -1,6 +1,6 @@
 """Thread service with state machine integration."""
 
-from datetime import datetime
+import datetime as dt
 from typing import Optional
 from uuid import UUID
 
@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from supportdesk.common.errors import StateTransitionError, state_transition_exception, thread_not_found_exception
 from supportdesk.common.pagination import PaginatedResponse, PaginationParams
 from supportdesk.events.repository import ThreadEventRepository
-from supportdesk.threads.models import ThreadState, PlatformType
+from supportdesk.common.enums import ThreadState, PlatformType
 from supportdesk.threads.repository import ThreadRepository
 from supportdesk.threads.schemas import ThreadCreate, ThreadResponse, StateTransition
 from supportdesk.threads.state_machine import ThreadStateMachine
@@ -25,15 +25,33 @@ class ThreadService:
     
     async def create_thread(self, tenant_id: UUID, thread_data: ThreadCreate) -> ThreadResponse:
         """Create a new thread."""
+        # Validate customer exists and is active
+        from supportdesk.customers.repository import CustomerRepository
+        customer_repo = CustomerRepository(self.db)
+        customer = await customer_repo.get_by_id(thread_data.customer_id, tenant_id)
+        
+        if not customer or not customer.is_active:
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=404,
+                detail="Customer not found or inactive"
+            )
+        
         thread_dict = thread_data.model_dump()
         thread = await self.thread_repo.create(tenant_id, thread_dict)
         
-        # Log creation event
+        # Log creation event with deterministic correlation_id
+        from supportdesk.worker.tasks import generate_deterministic_uuid
+        current_hour = dt.datetime.now(dt.timezone.utc).replace(minute=0, second=0, microsecond=0)
+        hour_iso = current_hour.isoformat()
+        correlation_id = generate_deterministic_uuid(str(thread.tenant_id), str(thread.id), hour_iso, "thread_created")
+        
         await self.event_repo.create({
             "thread_id": thread.id,
             "event_type": "thread_created",
             "new_state": thread.state,
             "actor_type": "system",
+            "correlation_id": correlation_id,
             "metadata": {"created_by": "api"}
         })
         
@@ -61,7 +79,7 @@ class ThreadService:
         customer_id: Optional[UUID] = None,
         platform: Optional[PlatformType] = None,
         priority_min: Optional[int] = None,
-        created_after: Optional[datetime] = None
+        created_after: Optional[dt.datetime] = None
     ) -> PaginatedResponse[ThreadResponse]:
         """List threads with filtering and pagination."""
         threads, total = await self.thread_repo.list_paginated(
@@ -156,3 +174,12 @@ class ThreadService:
                     "trigger": "first_message"
                 }
             })
+
+    async def soft_delete(self, thread_id: UUID, tenant_id: UUID) -> None:
+        """Cascade soft delete a thread and all related data."""
+        # Verify thread exists
+        thread = await self.thread_repo.get_by_id(thread_id, tenant_id)
+        if not thread:
+            raise thread_not_found_exception(thread_id, tenant_id)
+        
+        await self.thread_repo.cascade_soft_delete_thread(thread_id, tenant_id)

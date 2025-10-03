@@ -2,8 +2,9 @@
 
 from typing import Optional
 from uuid import UUID
+import datetime as dt
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,8 +21,8 @@ class CustomerRepository:
 
     async def get_by_id(
         self,
-        tenant_id: UUID,
         customer_id: UUID,
+        tenant_id: UUID,
         include_inactive: bool = False
     ) -> Optional[Customer]:
         """Get customer by ID within a tenant."""
@@ -124,6 +125,56 @@ class CustomerRepository:
     async def soft_delete(self, customer: Customer) -> None:
         """Soft delete a customer by setting is_active to False."""
         customer.is_active = False
+        await self.db.commit()
+
+    async def cascade_soft_delete_customer(self, customer_id: UUID, tenant_id: UUID) -> None:
+        """Cascade soft delete a customer and all related threads, messages, and events."""
+        now = dt.datetime.now(dt.timezone.utc)
+        
+        # Soft delete the customer
+        await self.db.execute(
+            update(Customer)
+            .where(Customer.id == customer_id, Customer.tenant_id == tenant_id)
+            .values(is_active=False, updated_at=now)
+        )
+        
+        # Import here to avoid circular imports
+        from supportdesk.threads.models import Thread
+        from supportdesk.messages.models import Message
+        from supportdesk.events.models import ThreadEvent
+        
+        # Get all threads for this customer
+        thread_ids_result = await self.db.execute(
+            select(Thread.id).where(
+                Thread.customer_id == customer_id,
+                Thread.tenant_id == tenant_id,
+                Thread.is_active == True
+            )
+        )
+        thread_ids = [row[0] for row in thread_ids_result.fetchall()]
+        
+        if thread_ids:
+            # Soft delete all threads
+            await self.db.execute(
+                update(Thread)
+                .where(Thread.id.in_(thread_ids))
+                .values(is_active=False, updated_at=now)
+            )
+            
+            # Soft delete all messages for these threads
+            await self.db.execute(
+                update(Message)
+                .where(Message.thread_id.in_(thread_ids))
+                .values(is_active=False, updated_at=now)
+            )
+            
+            # Soft delete all events for these threads
+            await self.db.execute(
+                update(ThreadEvent)
+                .where(ThreadEvent.thread_id.in_(thread_ids))
+                .values(is_active=False, updated_at=now)
+            )
+        
         await self.db.commit()
 
     async def exists_by_external_id(

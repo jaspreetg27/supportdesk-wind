@@ -9,6 +9,7 @@ from supportdesk.models.base import BaseModel
 
 if TYPE_CHECKING:
     from supportdesk.customers.models import Customer
+    from supportdesk.threads.models import Thread
 
 
 class Tenant(BaseModel):

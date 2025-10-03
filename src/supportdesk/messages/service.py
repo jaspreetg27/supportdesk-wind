@@ -2,13 +2,15 @@
 
 from typing import Optional
 from uuid import UUID, uuid4
+import datetime as dt
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from supportdesk.common.errors import message_not_found_exception, immutable_field_exception
 from supportdesk.common.pagination import PaginatedResponse, PaginationParams
-from supportdesk.messages.models import MessageType
+from supportdesk.config import settings
+from supportdesk.common.enums import MessageType
 from supportdesk.messages.repository import MessageRepository
 from supportdesk.messages.schemas import MessageCreate, MessageResponse, MessageUpdate
 from supportdesk.threads.repository import ThreadRepository
@@ -57,9 +59,9 @@ class MessageService:
             if message.type == MessageType.INBOUND:
                 await self._trigger_debounce(tenant_id, thread_id)
                 
-                # In test mode, also perform immediate auto-ACK
-                # For now, always perform auto-ACK to make tests pass
-                await self._perform_auto_ack(tenant_id, thread_id)
+                # In test mode, also perform immediate auto-ACK if enabled
+                if settings.auto_ack_test_mode:
+                    await self._perform_auto_ack(tenant_id, thread_id)
         
         # Create response manually to avoid lazy loading issues
         response = MessageResponse(
@@ -195,7 +197,7 @@ class MessageService:
     
     async def _perform_auto_ack(self, tenant_id: UUID, thread_id: UUID) -> None:
         """Perform immediate auto-ACK for test mode."""
-        from supportdesk.threads.models import ThreadState
+        from supportdesk.common.enums import ThreadState
         from supportdesk.database import AsyncSessionLocal
         
         # Use a separate database session to avoid transaction conflicts
@@ -213,12 +215,18 @@ class MessageService:
                 # Update thread state to ACKNOWLEDGED
                 await thread_repo.update_state(thread_id, tenant_id, ThreadState.ACKNOWLEDGED)
                 
-                # Create state transition event
+                # Create state transition event with deterministic correlation_id
+                from supportdesk.worker.tasks import generate_deterministic_uuid
+                current_hour = dt.datetime.now(dt.timezone.utc).replace(minute=0, second=0, microsecond=0)
+                hour_iso = current_hour.isoformat()
+                correlation_id = generate_deterministic_uuid(str(tenant_id), str(thread_id), hour_iso, "debounce_window")
+                
                 await event_repo.create({
                     "thread_id": thread_id,
                     "event_type": "state_transition",
                     "old_state": ThreadState.NEW,
                     "new_state": ThreadState.ACKNOWLEDGED,
                     "actor_type": "system",
+                    "correlation_id": correlation_id,
                     "metadata": {"reason": "auto_ack_test_mode"}
                 })

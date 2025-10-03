@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from supportdesk.common.deps import clear_admin_override
 from supportdesk.database import engine, get_db
 from supportdesk.main import app
+from supportdesk.redis_client import redis_client
 
 
 @pytest.fixture(scope="session")
@@ -32,10 +33,65 @@ async def _db_clean_between_tests():
 
 
 @pytest.fixture(autouse=True)
+async def _redis_clean_between_tests():
+    """Clean Redis keys between tests to avoid conflicts."""
+    async def clear_redis_keys():
+        try:
+            # Use FLUSHDB to clear all keys in the current database
+            # This is more comprehensive than selective deletion
+            await redis_client.flushdb()
+        except Exception:
+            # Redis might not be available in some test environments
+            # Fall back to selective deletion
+            try:
+                esc_keys = await redis_client.keys("esc:*")
+                if esc_keys:
+                    await redis_client.delete(*esc_keys)
+                
+                autoack_keys = await redis_client.keys("autoack:*")
+                if autoack_keys:
+                    await redis_client.delete(*autoack_keys)
+                
+                debounce_keys = await redis_client.keys("debounce:*")
+                if debounce_keys:
+                    await redis_client.delete(*debounce_keys)
+            except Exception:
+                pass
+    
+    # Clear keys before test
+    await clear_redis_keys()
+    
+    yield
+    
+    # Clear keys after test
+    await clear_redis_keys()
+
+
+@pytest.fixture(autouse=True)
 def cleanup_admin_override():
     """Automatically clear admin override after each test."""
     yield
     clear_admin_override()
+
+
+@pytest.fixture(autouse=True)
+def cleanup_patches():
+    """Ensure all patches are cleaned up between tests."""
+    from unittest.mock import _patch
+    
+    # Store initial patch state
+    initial_patches = list(_patch._active_patches)
+    
+    yield
+    
+    # Clean up any lingering patches
+    current_patches = list(_patch._active_patches)
+    for patch in current_patches:
+        if patch not in initial_patches:
+            try:
+                patch.stop()
+            except Exception:
+                pass
 
 
 @pytest_asyncio.fixture

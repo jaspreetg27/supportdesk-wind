@@ -47,7 +47,7 @@ tags_metadata = [
         "description": "Tenant management operations. Tenants are the top-level organizational units that provide multi-tenant isolation.",
     },
     {
-        "name": "Customers",
+        "name": "customers",
         "description": "Customer management operations",
     },
     {
@@ -82,6 +82,70 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content=exc.detail,
+    )
+
+
+# Custom exception handler for Pydantic validation errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle Pydantic validation errors with 422 status."""
+    # Clean up errors to make them JSON serializable
+    cleaned_errors = []
+    for error in exc.errors():
+        cleaned_error = {
+            "type": error.get("type"),
+            "loc": error.get("loc"),
+            "msg": error.get("msg"),
+            "input": error.get("input")
+        }
+        # Add URL if present
+        if "url" in error:
+            cleaned_error["url"] = error["url"]
+        cleaned_errors.append(cleaned_error)
+    
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": cleaned_errors
+        }
+    )
+
+
+# Custom exception handler for ValueError (domain validation)
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    """Handle ValueError with 400 status for domain validation errors."""
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": str(exc)
+        }
+    )
+
+
+# Custom exception handler for ValidationError (Pydantic)
+@app.exception_handler(ValidationError)
+async def pydantic_validation_error_handler(request: Request, exc: ValidationError):
+    """Handle Pydantic ValidationError with 422 status."""
+    # Clean up errors to make them JSON serializable
+    cleaned_errors = []
+    for error in exc.errors():
+        cleaned_error = {
+            "type": error.get("type"),
+            "loc": error.get("loc"),
+            "msg": error.get("msg"),
+            "input": error.get("input")
+        }
+        # Add URL if present
+        if "url" in error:
+            cleaned_error["url"] = error["url"]
+        cleaned_errors.append(cleaned_error)
+    
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": cleaned_errors
+        }
     )
 
 

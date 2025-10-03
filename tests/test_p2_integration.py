@@ -9,100 +9,109 @@ class TestP2Integration:
     
     def test_complete_thread_lifecycle(self, client: TestClient, tenant_id: str, customer_id: str):
         """Test complete thread lifecycle from creation to closure."""
-        # 1. Create thread
-        thread_data = {
-            "customer_id": customer_id,
-            "platform": "whatsapp",
-            "platform_thread_id": "wa_lifecycle_test",
-            "subject": "Complete lifecycle test"
-        }
+        # Enable auto-ack test mode for this test
+        from supportdesk.config import settings
+        original_auto_ack = settings.auto_ack_test_mode
+        settings.auto_ack_test_mode = True
         
-        response = client.post(f"/api/v1/tenants/{tenant_id}/threads/", json=thread_data)
-        assert response.status_code == 201
-        thread_id = response.json()["id"]
-        assert response.json()["state"] == "new"
-        
-        # 2. Add inbound message (triggers auto-ACK)
-        message_data = {
-            "platform_message_id": "lifecycle_msg_1",
-            "type": "inbound",
-            "content": "I need help with my order"
-        }
-        
-        response = client.post(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/messages/", json=message_data)
-        assert response.status_code == 201
-        
-        # 3. Verify auto-acknowledgment
-        response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}")
-        assert response.json()["state"] == "acknowledged"
-        
-        # 4. Transition to in_progress
-        transition_data = {
-            "current_state": "acknowledged",
-            "next_state": "in_progress",
-            "reason": "Agent picked up the case",
-            "actor_type": "user"
-        }
-        
-        response = client.put(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/state", json=transition_data)
-        assert response.status_code == 200
-        assert response.json()["state"] == "in_progress"
-        
-        # 5. Add outbound message
-        outbound_message = {
-            "platform_message_id": "lifecycle_msg_2",
-            "type": "outbound",
-            "content": "I can help you with that. What's your order number?"
-        }
-        
-        response = client.post(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/messages/", json=outbound_message)
-        assert response.status_code == 201
-        
-        # 6. Transition to resolved
-        transition_data = {
-            "current_state": "in_progress",
-            "next_state": "resolved",
-            "reason": "Issue resolved successfully"
-        }
-        
-        response = client.put(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/state", json=transition_data)
-        assert response.status_code == 200
-        thread_data = response.json()
-        assert thread_data["state"] == "resolved"
-        assert thread_data["priority"] == 0  # Auto-reset on resolved
-        
-        # 7. Close thread
-        transition_data = {
-            "current_state": "resolved",
-            "next_state": "closed",
-            "reason": "Customer confirmed resolution"
-        }
-        
-        response = client.put(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/state", json=transition_data)
-        assert response.status_code == 200
-        assert response.json()["state"] == "closed"
-        
-        # 8. Verify complete audit trail
-        response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/events/")
-        events = response.json()["items"]
-        
-        # Should have: creation, auto-ack, manual transitions
-        event_types = [e["event_type"] for e in events]
-        assert "thread_created" in event_types
-        assert "state_transition" in event_types
-        
-        # Count state transitions
-        transitions = [e for e in events if e["event_type"] == "state_transition"]
-        assert len(transitions) >= 4  # new->ack, ack->progress, progress->resolved, resolved->closed
-        
-        # 9. Verify message count and ordering
-        response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/messages/")
-        messages = response.json()["items"]
-        assert len(messages) == 2
-        
-        # Messages should be ordered by sent_at/created_at
-        assert messages[0]["type"] == "inbound"
-        assert messages[1]["type"] == "outbound"
+        try:
+            # 1. Create thread
+            thread_data = {
+                "customer_id": customer_id,
+                "platform": "whatsapp",
+                "platform_thread_id": "wa_lifecycle_test",
+                "subject": "Complete lifecycle test"
+            }
+            
+            response = client.post(f"/api/v1/tenants/{tenant_id}/threads/", json=thread_data)
+            assert response.status_code == 201
+            thread_id = response.json()["id"]
+            assert response.json()["state"] == "new"
+            
+            # 2. Add inbound message (triggers auto-ACK)
+            message_data = {
+                "platform_message_id": "lifecycle_msg_1",
+                "type": "inbound",
+                "content": "I need help with my order"
+            }
+            
+            response = client.post(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/messages/", json=message_data)
+            assert response.status_code == 201
+            
+            # 3. Verify auto-acknowledgment
+            response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}")
+            assert response.json()["state"] == "acknowledged"
+            
+            # 4. Transition to in_progress
+            transition_data = {
+                "current_state": "acknowledged",
+                "next_state": "in_progress",
+                "reason": "Agent picked up the case",
+                "actor_type": "user"
+            }
+            
+            response = client.put(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/state", json=transition_data)
+            assert response.status_code == 200
+            assert response.json()["state"] == "in_progress"
+            
+            # 5. Add outbound message
+            outbound_message = {
+                "platform_message_id": "lifecycle_msg_2",
+                "type": "outbound",
+                "content": "I can help you with that. What's your order number?"
+            }
+            
+            response = client.post(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/messages/", json=outbound_message)
+            assert response.status_code == 201
+            
+            # 6. Resolve thread
+            transition_data = {
+                "current_state": "in_progress",
+                "next_state": "resolved",
+                "reason": "Issue resolved successfully"
+            }
+            
+            response = client.put(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/state", json=transition_data)
+            assert response.status_code == 200
+            thread_data = response.json()
+            assert thread_data["state"] == "resolved"
+            assert thread_data["priority"] == 0  # Auto-reset on resolved
+            
+            # 7. Close thread
+            transition_data = {
+                "current_state": "resolved",
+                "next_state": "closed",
+                "reason": "Customer confirmed resolution"
+            }
+            
+            response = client.put(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/state", json=transition_data)
+            assert response.status_code == 200
+            assert response.json()["state"] == "closed"
+            
+            # 8. Verify complete audit trail
+            response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/events/")
+            events = response.json()["items"]
+            
+            # Should have: creation, auto-ack, manual transitions
+            event_types = [e["event_type"] for e in events]
+            assert "thread_created" in event_types
+            assert "state_transition" in event_types
+            
+            # Count state transitions
+            transitions = [e for e in events if e["event_type"] == "state_transition"]
+            assert len(transitions) >= 4  # new->ack, ack->progress, progress->resolved, resolved->closed
+            
+            # 9. Verify message count and ordering
+            response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/messages/")
+            messages = response.json()["items"]
+            assert len(messages) == 2
+            
+            # Messages should be ordered by sent_at/created_at
+            assert messages[0]["type"] == "inbound"
+            assert messages[1]["type"] == "outbound"
+        finally:
+            # Restore original setting
+            settings.auto_ack_test_mode = original_auto_ack
     
     def test_urgent_escalation_flow(self, client: TestClient, tenant_id: str, customer_id: str):
         """Test urgent escalation flow."""

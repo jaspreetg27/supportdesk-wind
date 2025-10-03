@@ -53,7 +53,7 @@ class CustomerService:
     ) -> CustomerResponse:
         """Get a customer by ID within a tenant."""
         customer = await self.customer_repo.get_by_id(
-            tenant_id, customer_id, include_inactive=include_inactive
+            customer_id, tenant_id, include_inactive=include_inactive
         )
         if not customer:
             raise customer_not_found_exception(customer_id, tenant_id)
@@ -120,7 +120,7 @@ class CustomerService:
     ) -> CustomerResponse:
         """Update a customer within a tenant."""
         customer = await self.customer_repo.get_by_id(
-            tenant_id, customer_id, include_inactive=include_inactive
+            customer_id, tenant_id, include_inactive=include_inactive
         )
         if not customer:
             raise customer_not_found_exception(customer_id, tenant_id)
@@ -136,12 +136,27 @@ class CustomerService:
     ) -> None:
         """Soft delete a customer within a tenant."""
         customer = await self.customer_repo.get_by_id(
-            tenant_id, customer_id, include_inactive=include_inactive
+            customer_id, tenant_id, include_inactive=include_inactive
         )
         if not customer:
             raise customer_not_found_exception(customer_id, tenant_id)
 
-        await self.customer_repo.soft_delete(customer)
+        await self.customer_repo.cascade_soft_delete_customer(customer_id, tenant_id)
+
+    async def soft_delete(
+        self,
+        tenant_id: UUID,
+        customer_id: UUID,
+        include_inactive: bool = False
+    ) -> None:
+        """Cascade soft delete a customer and all related data within a tenant."""
+        customer = await self.customer_repo.get_by_id(
+            customer_id, tenant_id, include_inactive=include_inactive
+        )
+        if not customer:
+            raise customer_not_found_exception(customer_id, tenant_id)
+
+        await self.customer_repo.cascade_soft_delete_customer(customer_id, tenant_id)
 
     async def _get_customer_model(
         self,
@@ -151,7 +166,7 @@ class CustomerService:
     ) -> Customer:
         """Get customer model (internal use)."""
         customer = await self.customer_repo.get_by_id(
-            tenant_id, customer_id, include_inactive=include_inactive
+            customer_id, tenant_id, include_inactive=include_inactive
         )
         if not customer:
             raise customer_not_found_exception(customer_id, tenant_id)

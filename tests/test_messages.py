@@ -10,28 +10,37 @@ class TestMessageAPI:
     
     def test_add_inbound_message(self, client: TestClient, tenant_id: str, thread_id: str):
         """Test adding inbound message with auto-ACK."""
-        message_data = {
-            "platform_message_id": "wa_msg_001",
-            "type": "inbound",
-            "content": "Hello, I need help with my order",
-            "sent_at": "2024-01-15T10:00:00Z",
-            "metadata": {"phone_number": "+1234567890"}
-        }
+        # Enable auto-ack test mode for this test
+        from supportdesk.config import settings
+        original_auto_ack = settings.auto_ack_test_mode
+        settings.auto_ack_test_mode = True
         
-        response = client.post(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/messages/", json=message_data)
-        
-        assert response.status_code == 201
-        data = response.json()
-        assert data["platform_message_id"] == "wa_msg_001"
-        assert data["type"] == "inbound"
-        assert data["content"] == "Hello, I need help with my order"
-        assert data["existing"] is False
-        
-        # Verify thread state changed to acknowledged (auto-ACK)
-        thread_response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}")
-        thread_data = thread_response.json()
-        assert thread_data["state"] == "acknowledged"
-        assert thread_data["message_count"] == 1
+        try:
+            message_data = {
+                "platform_message_id": "wa_msg_001",
+                "type": "inbound",
+                "content": "Hello, I need help with my order",
+                "sent_at": "2024-01-15T10:00:00Z",
+                "metadata": {"phone_number": "+1234567890"}
+            }
+            
+            response = client.post(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}/messages/", json=message_data)
+            
+            assert response.status_code == 201
+            data = response.json()
+            assert data["platform_message_id"] == "wa_msg_001"
+            assert data["type"] == "inbound"
+            assert data["content"] == "Hello, I need help with my order"
+            assert data["existing"] is False
+            
+            # Verify thread state changed to acknowledged (auto-ACK)
+            thread_response = client.get(f"/api/v1/tenants/{tenant_id}/threads/{thread_id}")
+            thread_data = thread_response.json()
+            assert thread_data["state"] == "acknowledged"
+            assert thread_data["message_count"] == 1
+        finally:
+            # Restore original setting
+            settings.auto_ack_test_mode = original_auto_ack
     
     def test_deduplication_by_platform_message_id(self, client: TestClient, tenant_id: str, thread_id: str):
         """Test message deduplication returns existing=true."""

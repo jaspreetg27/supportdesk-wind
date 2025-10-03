@@ -9,7 +9,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from supportdesk.config import settings
-from supportdesk.messages.models import Message, MessageType
+from supportdesk.messages.models import Message
+from supportdesk.common.enums import MessageType
 
 
 class MessageRepository:
@@ -114,14 +115,19 @@ class MessageRepository:
         thread_check = await self.db.execute(
             select(Thread).where(
                 Thread.id == thread_id,
-                Thread.tenant_id == tenant_id
+                Thread.tenant_id == tenant_id,
+                Thread.is_active == True
             )
         )
         if not thread_check.scalar_one_or_none():
-            return [], 0
+            from supportdesk.common.errors import thread_not_found_exception
+            raise thread_not_found_exception(thread_id, tenant_id)
         
         # Base query
-        base_query = select(Message).where(Message.thread_id == thread_id)
+        base_query = select(Message).where(
+            Message.thread_id == thread_id,
+            Message.is_active == True
+        )
         
         # Count query
         count_query = select(func.count()).select_from(base_query.subquery())

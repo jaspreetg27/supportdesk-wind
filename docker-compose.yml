@@ -31,7 +31,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["celery", "-A", "supportdesk.worker.app", "worker", "--loglevel=info"]
+    command: ["celery", "-A", "supportdesk.worker.app:celery_app", "worker", "--loglevel=info"]
     # Mount only code for quick iteration.
     volumes:
       - ./src:/app/src
